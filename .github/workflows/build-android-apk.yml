@@ -30,7 +30,7 @@ jobs:
       - name: Generate keystore
         run: |
           keytool -genkeypair -v -keystore keystore.jks -alias simplelive -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=SimpleLive, OU=Test, O=Test, L=Test, ST=Test, C=CN"
-          mv keystore.jks simple_live_app/android/keystore.jks
+          mv keystore.jks simple_live_app/android/app/keystore.jks
           echo "storeFile=keystore.jks" > simple_live_app/android/key.properties
           echo "storePassword=123456" >> simple_live_app/android/key.properties
           echo "keyPassword=123456" >> simple_live_app/android/key.properties
