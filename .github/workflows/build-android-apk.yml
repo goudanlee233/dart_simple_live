@@ -40,6 +40,7 @@ jobs:
         run: |
           cd simple_live_app
           flutter pub add dynamic_color:1.8.1
+          flutter pub add auto_orientation_v2:2.3.6
           flutter pub get
 
       - name: Build APK
