@@ -1,0 +1,56 @@
+name: build-android-apk
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "dev_v*"
+
+jobs:
+  build-android:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          cache: true
+
+      - name: Generate keystore
+        run: |
+          keytool -genkeypair -v -keystore keystore.jks -alias simplelive -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=SimpleLive, OU=Test, O=Test, L=Test, ST=Test, C=CN"
+          mv keystore.jks simple_live_app/android/keystore.jks
+          echo "storeFile=keystore.jks" > simple_live_app/android/key.properties
+          echo "storePassword=123456" >> simple_live_app/android/key.properties
+          echo "keyPassword=123456" >> simple_live_app/android/key.properties
+          echo "keyAlias=simplelive" >> simple_live_app/android/key.properties
+
+      - name: Restore packages
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      - name: Build APK
+        run: |
+          cd simple_live_app
+          flutter build apk --release --split-per-abi
+
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: |
+            simple_live_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
