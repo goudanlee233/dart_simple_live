@@ -26,19 +26,28 @@ jobs:
       - name: Patch MSVC coroutine compat
         shell: pwsh
         run: |
+          $macro = 'add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)'
+          $runner = 'simple_live_app/windows/CMakeLists.txt'
+          if (Test-Path $runner) {
+            $c = Get-Content -LiteralPath $runner -Raw
+            if ($c -notmatch 'SILENCE_EXPERIMENTAL_COROUTINE') {
+              $c = $c -replace '(?m)(^cmake_minimum_required\([^\r\n]+\)\r?\n)', "$1`n$macro`n"
+              Set-Content -LiteralPath $runner -Value $c -Encoding UTF8
+              Write-Output 'patched runner CMakeLists'
+            } else {
+              Write-Output 'runner already patched'
+            }
+          }
           $cacheRoot = Join-Path $env:LOCALAPPDATA 'Pub\Cache\hosted\pub.dev'
-          $dirs = Get-ChildItem -Path $cacheRoot -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'flutter_inappwebview_windows-*' }
-          foreach ($d in $dirs) {
-            $cmake = Join-Path $d.FullName 'windows\CMakeLists.txt'
-            if (Test-Path $cmake) {
-              $content = Get-Content -LiteralPath $cmake -Raw
-              $patch = "# silence experimental coroutine deprecation (MSVC STL1011)`nadd_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)`n"
-              if ($content -notmatch 'SILENCE_EXPERIMENTAL_COROUTINE') {
-                Set-Content -LiteralPath $cmake -Value ($patch + $content) -Encoding UTF8
-                Write-Output "patched: $($d.Name)"
-              } else {
-                Write-Output "already patched: $($d.Name)"
-              }
+          $files = Get-ChildItem -Path $cacheRoot -Recurse -Filter 'CMakeLists.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\windows\\CMakeLists\.txt$' }
+          foreach ($f in $files) {
+            $content = Get-Content -LiteralPath $f.FullName -Raw
+            if ($content -notmatch 'SILENCE_EXPERIMENTAL_COROUTINE') {
+              $content = $content -replace '(?m)(^cmake_minimum_required\([^\r\n]+\)\r?\n)', "$1`n$macro`n"
+              Set-Content -LiteralPath $f.FullName -Value $content -Encoding UTF8
+              Write-Output "patched plugin: $($f.Directory.Parent.Parent.Name)"
+            } else {
+              Write-Output "already patched: $($f.Directory.Parent.Parent.Name)"
             }
           }
       - name: Build Windows
