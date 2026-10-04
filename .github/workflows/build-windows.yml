@@ -23,6 +23,24 @@ jobs:
         run: |
           cd simple_live_app
           flutter pub get
+      - name: Patch MSVC coroutine compat
+        shell: pwsh
+        run: |
+          $cacheRoot = Join-Path $env:LOCALAPPDATA 'Pub\Cache\hosted\pub.dev'
+          $dirs = Get-ChildItem -Path $cacheRoot -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'flutter_inappwebview_windows-*' }
+          foreach ($d in $dirs) {
+            $cmake = Join-Path $d.FullName 'windows\CMakeLists.txt'
+            if (Test-Path $cmake) {
+              $content = Get-Content -LiteralPath $cmake -Raw
+              $patch = "# silence experimental coroutine deprecation (MSVC STL1011)`nadd_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)`n"
+              if ($content -notmatch 'SILENCE_EXPERIMENTAL_COROUTINE') {
+                Set-Content -LiteralPath $cmake -Value ($patch + $content) -Encoding UTF8
+                Write-Output "patched: $($d.Name)"
+              } else {
+                Write-Output "already patched: $($d.Name)"
+              }
+            }
+          }
       - name: Build Windows
         run: |
           cd simple_live_app
