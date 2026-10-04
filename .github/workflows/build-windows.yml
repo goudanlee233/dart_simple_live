@@ -1,0 +1,38 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths: [ '.github/workflows/build-windows.yml' ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          cache: true
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+      - name: Restore packages
+        run: |
+          cd simple_live_app
+          flutter pub get
+      - name: Build Windows
+        run: |
+          cd simple_live_app
+          flutter build windows --release
+      - name: Package ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "simple_live_app/build/windows/x64/runner/Release/*" -DestinationPath "simple_live_windows.zip"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple_live_windows
+          path: simple_live_windows.zip
