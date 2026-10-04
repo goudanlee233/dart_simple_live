@@ -27,29 +27,22 @@ jobs:
         shell: pwsh
         run: |
           $macro = 'add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)'
-          $runner = 'simple_live_app/windows/CMakeLists.txt'
-          if (Test-Path $runner) {
-            $c = Get-Content -LiteralPath $runner -Raw
-            if ($c -notmatch 'SILENCE_EXPERIMENTAL_COROUTINE') {
-              $c = $c -replace '(?m)(^cmake_minimum_required\([^\r\n]+\)\r?\n)', "$1`n$macro`n"
-              Set-Content -LiteralPath $runner -Value $c -Encoding UTF8
-              Write-Output 'patched runner CMakeLists'
-            } else {
-              Write-Output 'runner already patched'
-            }
+          function Add-MacroIfMissing([string]$path) {
+            if (-not (Test-Path -LiteralPath $path)) { Write-Output "missing: $path"; return }
+            $content = Get-Content -LiteralPath $path -Raw
+            if ($content -match 'SILENCE_EXPERIMENTAL_COROUTINE') { Write-Output "already: $path"; return }
+            $idx = $content.IndexOf('cmake_minimum_required')
+            if ($idx -lt 0) { Write-Output "no-cmr: $path"; return }
+            $lineEnd = $content.IndexOf([char]10, $idx)
+            if ($lineEnd -lt 0) { $lineEnd = $content.Length }
+            $content = $content.Insert($lineEnd + 1, "$macro`r`n")
+            Set-Content -LiteralPath $path -Value $content -Encoding UTF8
+            Write-Output "patched: $path"
           }
+          Add-MacroIfMissing 'simple_live_app/windows/CMakeLists.txt'
           $cacheRoot = Join-Path $env:LOCALAPPDATA 'Pub\Cache\hosted\pub.dev'
           $files = Get-ChildItem -Path $cacheRoot -Recurse -Filter 'CMakeLists.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\windows\\CMakeLists\.txt$' }
-          foreach ($f in $files) {
-            $content = Get-Content -LiteralPath $f.FullName -Raw
-            if ($content -notmatch 'SILENCE_EXPERIMENTAL_COROUTINE') {
-              $content = $content -replace '(?m)(^cmake_minimum_required\([^\r\n]+\)\r?\n)', "$1`n$macro`n"
-              Set-Content -LiteralPath $f.FullName -Value $content -Encoding UTF8
-              Write-Output "patched plugin: $($f.Directory.Parent.Parent.Name)"
-            } else {
-              Write-Output "already patched: $($f.Directory.Parent.Parent.Name)"
-            }
-          }
+          foreach ($f in $files) { Add-MacroIfMissing $f.FullName }
       - name: Build Windows
         run: |
           cd simple_live_app
