@@ -152,14 +152,18 @@ class LiveRoomPage extends GetView<LiveRoomController> {
               Expanded(
                 child: buildMediaPlayer(),
               ),
-              SizedBox(
-                width: 300,
-                child: Column(
-                  children: [
-                    buildUserProfile(context),
-                    buildMessageArea(),
-                  ],
-                ),
+              Obx(
+                () => controller.sidebarVisible.value
+                    ? SizedBox(
+                        width: 300,
+                        child: Column(
+                          children: [
+                            buildUserProfile(context),
+                            buildMessageArea(),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
             ],
           ),
@@ -367,6 +371,24 @@ class LiveRoomPage extends GetView<LiveRoomController> {
                 ),
               ],
             ),
+            // 仅横屏/桌面端显示：收起右侧弹幕栏
+            if (MediaQuery.of(context).orientation == Orientation.landscape)
+              IconButton(
+                onPressed: () {
+                  controller.sidebarVisible.value = false;
+                },
+                icon: const Icon(
+                  Icons.keyboard_double_arrow_right,
+                  size: 20,
+                ),
+                tooltip: "收起侧边栏",
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 32,
+                  minHeight: 32,
+                ),
+              ),
           ],
         ),
       ),
@@ -771,6 +793,22 @@ class LiveRoomPage extends GetView<LiveRoomController> {
 
   List<Widget> buildAppbarActions(BuildContext context) {
     return [
+      // 仅横屏/桌面端显示：切换右侧弹幕栏显隐
+      if (MediaQuery.of(context).orientation == Orientation.landscape)
+        Obx(
+          () => IconButton(
+            onPressed: () {
+              controller.sidebarVisible.value =
+                  !controller.sidebarVisible.value;
+            },
+            icon: Icon(
+              controller.sidebarVisible.value
+                  ? Icons.view_sidebar
+                  : Icons.view_sidebar_outlined,
+            ),
+            tooltip: controller.sidebarVisible.value ? "收起侧边栏" : "展开侧边栏",
+          ),
+        ),
       IconButton(
         onPressed: () {
           showMore();
