@@ -96,6 +96,10 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
   /// - 当用户向上滚动聊天栏时，不再自动滚动
   var disableAutoScroll = false.obs;
 
+  /// 横屏/桌面端是否显示右侧栏（聊天/弹幕）
+  /// 默认显示；可通过侧边栏右上角按钮或标题栏按钮切换
+  var sidebarVisible = true.obs;
+
   /// 是否处于后台
   var isBackground = false;
 
