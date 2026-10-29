@@ -371,8 +371,11 @@ class LiveRoomPage extends GetView<LiveRoomController> {
                 ),
               ],
             ),
-            // 仅横屏/桌面端显示：收起右侧弹幕栏
-            if (MediaQuery.of(context).orientation == Orientation.landscape)
+            // 仅桌面端（Windows/macOS/Linux）横屏显示：收起右侧弹幕栏
+            // Android/iOS 保持官方原样，不显示此按钮
+            if (!Platform.isAndroid &&
+                !Platform.isIOS &&
+                MediaQuery.of(context).orientation == Orientation.landscape)
               IconButton(
                 onPressed: () {
                   controller.sidebarVisible.value = false;
@@ -793,8 +796,10 @@ class LiveRoomPage extends GetView<LiveRoomController> {
 
   List<Widget> buildAppbarActions(BuildContext context) {
     return [
-      // 仅横屏/桌面端显示：切换右侧弹幕栏显隐
-      if (MediaQuery.of(context).orientation == Orientation.landscape)
+      // 仅桌面端（Windows/macOS/Linux）横屏显示：切换右侧弹幕栏显隐
+      if (!Platform.isAndroid &&
+          !Platform.isIOS &&
+          MediaQuery.of(context).orientation == Orientation.landscape)
         Obx(
           () => IconButton(
             onPressed: () {
