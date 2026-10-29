@@ -38,11 +38,6 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- 禁用 Impeller 渲染引擎，回退到 Skia/OpenGL。
-             车机 GPU 的 Vulkan 实现常常不完整，启用 Impeller 会导致界面卡顿。 -->
-        <meta-data
-            android:name="io.flutter.embedding.android.EnableImpeller"
-            android:value="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
