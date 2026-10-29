@@ -1,0 +1,168 @@
+name: Build All Platforms
+
+# 一次构建 3 个产物：Android 手机版 / Android TV 版 / Windows 版
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "build_v*"
+
+jobs:
+  # ==================== Android 手机版 ====================
+  android:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          cache: true
+
+      - name: Generate keystore
+        run: |
+          keytool -genkeypair -v -keystore keystore.jks -alias simplelive -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=SimpleLive, OU=Test, O=Test, L=Test, ST=Test, C=CN"
+          mv keystore.jks simple_live_app/android/app/keystore.jks
+          echo "storeFile=keystore.jks" > simple_live_app/android/key.properties
+          echo "storePassword=123456" >> simple_live_app/android/key.properties
+          echo "keyPassword=123456" >> simple_live_app/android/key.properties
+          echo "keyAlias=simplelive" >> simple_live_app/android/key.properties
+
+      - name: Restore packages
+        run: |
+          cd simple_live_app
+          flutter pub add dynamic_color:1.8.1
+          flutter pub add auto_orientation_v2:2.3.6
+          flutter pub get
+
+      - name: Build APK
+        run: |
+          cd simple_live_app
+          flutter build apk --release --split-per-abi
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-phone-apk
+          path: |
+            simple_live_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
+
+  # ==================== Android TV 版 ====================
+  tv:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          cache: true
+
+      - name: Generate keystore
+        run: |
+          keytool -genkeypair -v -keystore keystore.jks -alias simplelivetv -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=SimpleLiveTV, OU=Test, O=Test, L=Test, ST=Test, C=CN"
+          mv keystore.jks simple_live_tv_app/android/app/keystore.jks
+          echo "storeFile=keystore.jks" > simple_live_tv_app/android/key.properties
+          echo "storePassword=123456" >> simple_live_tv_app/android/key.properties
+          echo "keyPassword=123456" >> simple_live_tv_app/android/key.properties
+          echo "keyAlias=simplelivetv" >> simple_live_tv_app/android/key.properties
+
+      - name: Restore packages
+        run: |
+          cd simple_live_tv_app
+          flutter pub get
+
+      - name: Build TV APK
+        run: |
+          cd simple_live_tv_app
+          flutter build apk --release --split-per-abi
+
+      - name: Upload TV APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-tv-apk
+          path: |
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
+
+  # ==================== Windows 版 ====================
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          cache: true
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Restore packages
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      # 修复 MSVC 对 C++20 协程的实验性警告报错
+      - name: Patch MSVC coroutine compat
+        shell: pwsh
+        run: |
+          $macro = 'add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)'
+          function Add-MacroIfMissing([string]$path) {
+            if (-not (Test-Path -LiteralPath $path)) { Write-Output "missing: $path"; return }
+            $content = Get-Content -LiteralPath $path -Raw
+            if ($content -match 'SILENCE_EXPERIMENTAL_COROUTINE') { Write-Output "already: $path"; return }
+            $idx = $content.IndexOf('cmake_minimum_required')
+            if ($idx -lt 0) { Write-Output "no-cmr: $path"; return }
+            $lineEnd = $content.IndexOf([char]10, $idx)
+            if ($lineEnd -lt 0) { $lineEnd = $content.Length }
+            $content = $content.Insert($lineEnd + 1, "$macro`r`n")
+            Set-Content -LiteralPath $path -Value $content -Encoding UTF8
+            Write-Output "patched: $path"
+          }
+          Add-MacroIfMissing 'simple_live_app/windows/CMakeLists.txt'
+          $cacheRoot = Join-Path $env:LOCALAPPDATA 'Pub\Cache\hosted\pub.dev'
+          $files = Get-ChildItem -Path $cacheRoot -Recurse -Filter 'CMakeLists.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\windows\\CMakeLists\.txt$' }
+          foreach ($f in $files) { Add-MacroIfMissing $f.FullName }
+
+      - name: Build Windows
+        run: |
+          cd simple_live_app
+          flutter build windows --release
+
+      - name: Package ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "simple_live_app/build/windows/x64/runner/Release/*" -DestinationPath "simple_live_windows.zip"
+
+      - name: Upload Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: simple_live_windows.zip
